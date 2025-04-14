@@ -1,0 +1,13 @@
+2025-04-14 09:57:10,133 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.3.223:5001
+2025-04-14 09:57:10,133 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-04-14 09:57:10,148 - werkzeug - INFO -  * Restarting with stat
+2025-04-14 09:57:11,956 - werkzeug - WARNING -  * Debugger is active!
+2025-04-14 09:57:11,956 - werkzeug - INFO -  * Debugger PIN: 885-840-228
+2025-04-14 09:57:26,515 - werkzeug - INFO - 192.168.3.223 - - [14/Apr/2025 09:57:26] "GET / HTTP/1.1" 200 -
+2025-04-14 09:57:26,704 - werkzeug - INFO - 192.168.3.223 - - [14/Apr/2025 09:57:26] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2025-04-14 10:03:19,005 - __main__ - ERROR - Async query failed: 
+2025-04-14 10:03:22,403 - werkzeug - INFO - 192.168.3.223 - - [14/Apr/2025 10:03:22] "POST /analyze HTTP/1.1" 200 -
+2025-04-14 10:04:59,961 - werkzeug - INFO -  * Detected change in 'C:\\laragon\\www\\AuditIQ\\app.py', reloading
