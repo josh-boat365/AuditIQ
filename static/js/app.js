@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // DOM Elements
     const analyzeBtn = document.getElementById('analyzeBtn');
     const generateReportBtn = document.getElementById('generateReportBtn');
     const resultsSection = document.getElementById('resultsSection');
@@ -8,34 +7,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const detailedFindingsDiv = document.getElementById('detailedFindings');
     const severityChartCanvas = document.getElementById('severityChart');
     const branchChartCanvas = document.getElementById('branchChart');
+    const fileUpload = document.getElementById('fileUpload');
+    const exportSeverityBtn = document.getElementById('exportSeverityBtn');
+    const exportBranchBtn = document.getElementById('exportBranchBtn');
 
-    // Chart instances
     let severityChart = null;
     let branchChart = null;
-
-    // Store analysis results
     let currentAnalysis = null;
 
-    // Analyze Button Handler
-    // In your analyze button click handler:
+    // Restore previous analysis from localStorage
+    const savedAnalysis = localStorage.getItem('previousAnalysis');
+    if (savedAnalysis) {
+        const data = JSON.parse(savedAnalysis);
+        currentAnalysis = data;
+        displayResults(data);
+        resultsSection.classList.remove('d-none');
+    }
+
     analyzeBtn.addEventListener('click', async function () {
         const auditDataText = auditDataTextarea.value.trim();
 
-        
         try {
-
             const auditData = JSON.parse(auditDataText);
-
-            // Validate the nested structure
             if (!auditData.audit_report ?.exceptions) {
                 showAlert('JSON must contain audit_report with exceptions array', 'danger');
-                return;
-            }
-            // Validate JSON first
-            try {
-                JSON.parse(auditDataText);
-            } catch (e) {
-                showAlert('Invalid JSON format: ' + e.message, 'danger');
                 return;
             }
 
@@ -44,35 +39,26 @@ document.addEventListener('DOMContentLoaded', function () {
             const response = await fetch('/analyze', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: auditDataText
             });
 
             const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Analysis failed');
-            }
+            if (!response.ok) throw new Error(data.error || 'Analysis failed');
 
             currentAnalysis = data;
+            localStorage.setItem('previousAnalysis', JSON.stringify(data));
             displayResults(data);
             resultsSection.classList.remove('d-none');
-
         } catch (error) {
             console.error('Analysis error:', error);
             showAlert(`Analysis failed: ${error.message}`, 'danger');
-
-            // Show detailed error in console for debugging
-            if (error.response) {
-                console.error('Server response:', await error.response.json());
-            }
         } finally {
             setLoadingState(analyzeBtn, false, 'Analyze Data');
         }
     });
 
-    // Generate Report Button Handler
     generateReportBtn.addEventListener('click', async function () {
         if (!currentAnalysis) {
             showAlert('No analysis results available', 'warning');
@@ -81,23 +67,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             setLoadingState(generateReportBtn, true, 'Generating...');
-
             const response = await fetch('/generate-report', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(currentAnalysis)
             });
 
-            if (!response.ok) {
-                throw new Error('Report generation failed');
-            }
-
-            // Download the report
+            if (!response.ok) throw new Error('Report generation failed');
             const blob = await response.blob();
             downloadFile(blob, 'audit_report.docx');
-
         } catch (error) {
             console.error('Report generation error:', error);
             showAlert(`Report generation failed: ${error.message}`, 'danger');
@@ -106,13 +86,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Display Results Function
+    // File Upload Support
+    fileUpload.addEventListener('change', function () {
+        const file = fileUpload.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            auditDataTextarea.value = e.target.result;
+        };
+        reader.readAsText(file);
+    });
+
+    // Export Chart as PNG
+    exportSeverityBtn.addEventListener('click', () => exportChart(severityChart, 'severity_chart.png'));
+    exportBranchBtn.addEventListener('click', () => exportChart(branchChart, 'branch_chart.png'));
+
+    function exportChart(chart, filename) {
+        const url = chart.toBase64Image();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+    }
+
     function displayResults(data) {
-        // Clear previous charts if they exist
         if (severityChart) severityChart.destroy();
         if (branchChart) branchChart.destroy();
 
-        // Executive Summary
         executiveSummaryDiv.innerHTML = `
             <div class="card border-primary mb-4">
                 <div class="card-header bg-primary text-white">
@@ -124,7 +124,6 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
 
-        // Detailed Findings
         let findingsHTML = `
             <div class="card border-secondary mb-4">
                 <div class="card-header bg-secondary text-white">
@@ -133,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="card-body">
         `;
 
-        if (data.analysis.findings && data.analysis.findings.length > 0) {
+        if (data.analysis.findings ?.length > 0) {
             data.analysis.findings.forEach((finding, index) => {
                 findingsHTML += `
                     <div class="mb-4 p-3 border rounded">
@@ -151,20 +150,15 @@ document.addEventListener('DOMContentLoaded', function () {
             findingsHTML += '<p class="text-muted">No findings available</p>';
         }
 
-        findingsHTML += `</div></div>`;
+        findingsHTML += '</div></div>';
         detailedFindingsDiv.innerHTML = findingsHTML;
-
-        // Generate Charts with Actual Data
         generateCharts(data);
     }
 
-    // Generate Charts Function
     function generateCharts(data) {
-        // Process data for charts
         const severityData = processSeverityData(data);
         const branchData = processBranchData(data);
 
-        // Severity Chart
         severityChart = new Chart(severityChartCanvas, {
             type: 'bar',
             data: {
@@ -180,7 +174,6 @@ document.addEventListener('DOMContentLoaded', function () {
             options: getChartOptions('Exception Severity Distribution')
         });
 
-        // Branch Chart
         branchChart = new Chart(branchChartCanvas, {
             type: 'pie',
             data: {
@@ -196,65 +189,38 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Helper Functions
     function processSeverityData(data) {
-        // Extract severity data from analysis
         const severityCounts = {
             high: 0,
             medium: 0,
             low: 0,
             unspecified: 0
         };
-
-        if (data.analysis.findings) {
-            data.analysis.findings.forEach(finding => {
-                const severity = (finding.severity || 'unspecified').toLowerCase();
-                severityCounts[severity] = (severityCounts[severity] || 0) + 1;
-            });
-        }
+        data.analysis.findings ?.forEach(finding => {
+            const sev = (finding.severity || 'unspecified').toLowerCase();
+            severityCounts[sev] = (severityCounts[sev] || 0) + 1;
+        });
 
         return {
             labels: ['High', 'Medium', 'Low', 'Unspecified'],
-            values: [
-                severityCounts.high,
-                severityCounts.medium,
-                severityCounts.low,
-                severityCounts.unspecified
-            ],
-            colors: [
-                'rgba(220, 53, 69, 0.7)',
-                'rgba(255, 193, 7, 0.7)',
-                'rgba(25, 135, 84, 0.7)',
-                'rgba(108, 117, 125, 0.7)'
-            ],
-            borderColors: [
-                'rgba(220, 53, 69, 1)',
-                'rgba(255, 193, 7, 1)',
-                'rgba(25, 135, 84, 1)',
-                'rgba(108, 117, 125, 1)'
-            ]
+            values: [severityCounts.high, severityCounts.medium, severityCounts.low, severityCounts.unspecified],
+            colors: ['rgba(220,53,69,0.7)', 'rgba(255,193,7,0.7)', 'rgba(25,135,84,0.7)', 'rgba(108,117,125,0.7)'],
+            borderColors: ['rgba(220,53,69,1)', 'rgba(255,193,7,1)', 'rgba(25,135,84,1)', 'rgba(108,117,125,1)']
         };
     }
 
     function processBranchData(data) {
-        // Extract branch data from analysis
         const branchCounts = {};
-
-        if (data.analysis.participants) {
-            data.analysis.participants.forEach(participant => {
-                const branch = participant.branch || 'Unspecified';
-                branchCounts[branch] = (branchCounts[branch] || 0) + 1;
-            });
-        }
+        data.analysis.participants ?.forEach(p => {
+            const branch = p.branch || 'Unspecified';
+            branchCounts[branch] = (branchCounts[branch] || 0) + 1;
+        });
 
         const labels = Object.keys(branchCounts);
         return {
             labels: labels,
-            values: labels.map(label => branchCounts[label]),
-            colors: labels.map((_, i) => {
-                const hue = (i * 137.508) % 360; // Golden angle for distinct colors
-                return `hsla(${hue}, 70%, 60%, 0.7)`;
-            })
+            values: labels.map(l => branchCounts[l]),
+            colors: labels.map((_, i) => `hsla(${(i * 137.508) % 360}, 70%, 60%, 0.7)`)
         };
     }
 
@@ -300,11 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         `;
-
-        // Add alert to the top of the results section
         resultsSection.prepend(alertDiv);
-
-        // Auto-dismiss after 5 seconds
         setTimeout(() => {
             alertDiv.classList.remove('show');
             setTimeout(() => alertDiv.remove(), 150);
